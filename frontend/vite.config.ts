@@ -22,7 +22,7 @@ export default defineConfig({
     css: false,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html', 'lcov'],
+      reporter: [['text', { skipFull: false }], 'html', 'lcov'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/main.tsx', 'src/test/**', 'src/**/*.d.ts'],
       thresholds: { lines: 90, functions: 90, branches: 90, statements: 90 },

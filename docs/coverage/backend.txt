@@ -1,0 +1,30 @@
+# go test -coverprofile=coverage.out ./internal/... && go tool cover -func=coverage.out
+ok  	internal/api	(cached)	coverage: 100.0% of statements
+ok  	internal/calculator	(cached)	coverage: 100.0% of statements
+
+internal/api/errors.go:17:			Error		100.0%
+internal/api/errors.go:30:			invalidJSON	100.0%
+internal/api/errors.go:34:			invalidInput	100.0%
+internal/api/errors.go:52:			toAPIError	100.0%
+internal/api/errors.go:64:			writeError	100.0%
+internal/api/handlers.go:30:			handleHealth	100.0%
+internal/api/handlers.go:34:			handleCalculate	100.0%
+internal/api/handlers.go:68:			operands	100.0%
+internal/api/handlers.go:85:			decodeJSON	100.0%
+internal/api/handlers.go:113:		decodeError	100.0%
+internal/api/handlers.go:136:		writeJSON	100.0%
+internal/api/middleware.go:15:		WriteHeader	100.0%
+internal/api/middleware.go:21:		logRequests	100.0%
+internal/api/middleware.go:37:		recoverPanics	100.0%
+internal/api/router.go:10:			NewRouter	100.0%
+internal/calculator/calculator.go:32:	Apply		100.0%
+internal/calculator/calculator.go:59:	Lookup		100.0%
+internal/calculator/calculator.go:64:	index		100.0%
+internal/calculator/calculator.go:72:	add		100.0%
+internal/calculator/calculator.go:73:	subtract	100.0%
+internal/calculator/calculator.go:74:	multiply	100.0%
+internal/calculator/calculator.go:76:	divide		100.0%
+internal/calculator/calculator.go:83:	power		100.0%
+internal/calculator/calculator.go:91:	sqrt		100.0%
+internal/calculator/calculator.go:99:	percentage	100.0%
+total:							(statements)	100.0%
