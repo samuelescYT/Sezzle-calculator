@@ -1,0 +1,6 @@
+Dockerfile
+.dockerignore
+bin/
+*.out
+*.test
+coverage.html
