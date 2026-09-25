@@ -110,6 +110,11 @@ export function displayValue(state: CalculatorState): string {
   return state.entryState === 'typing' ? formatEntry(state.entry) : formatNumber(Number(state.entry))
 }
 
+/** The operator waiting for its second operand, highlighted on the keypad. */
+export function activeOperator(state: CalculatorState): BinaryOperator | null {
+  return state.entryState === 'awaiting' ? (state.pending?.operator ?? null) : null
+}
+
 function handleInput(state: CalculatorState, action: InputAction): CalculatorState {
   switch (action.type) {
     case 'digit':

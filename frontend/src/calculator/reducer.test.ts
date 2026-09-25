@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  activeOperator,
   calculatorReducer,
   displayValue,
   initialState,
@@ -331,5 +332,20 @@ describe('errors', () => {
     const state = press('c', fail(press('8/0='), 'Cannot divide by zero'))
     expect(state.error).toBeNull()
     expect(displayValue(state)).toBe('0')
+  })
+})
+
+describe('activeOperator', () => {
+  it('is the pending operator while waiting for the second operand', () => {
+    expect(activeOperator(press('5+'))).toBe('add')
+    expect(activeOperator(press('5+*'))).toBe('multiply')
+  })
+
+  it('is null once the second operand is being typed', () => {
+    expect(activeOperator(press('5+3'))).toBeNull()
+  })
+
+  it('is null with nothing pending', () => {
+    expect(activeOperator(initialState)).toBeNull()
   })
 })

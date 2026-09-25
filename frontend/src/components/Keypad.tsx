@@ -1,0 +1,98 @@
+import type { BinaryOperator, CalculatorAction, Digit } from '../calculator/reducer'
+
+type Variant = 'digit' | 'function' | 'operator'
+
+interface KeyDefinition {
+  label: string
+  name: string
+  action: CalculatorAction
+  variant: Variant
+  className?: string
+}
+
+const digit = (value: Digit, className?: string): KeyDefinition => ({
+  label: value,
+  name: value,
+  action: { type: 'digit', digit: value },
+  variant: 'digit',
+  className,
+})
+
+const operator = (label: string, name: string, value: BinaryOperator): KeyDefinition => ({
+  label,
+  name,
+  action: { type: 'operator', operator: value },
+  variant: 'operator',
+})
+
+/** Keys in visual order for a 4-column grid. */
+const KEYS: KeyDefinition[] = [
+  { label: 'AC', name: 'All clear', action: { type: 'clear' }, variant: 'function' },
+  { label: '⌫', name: 'Backspace', action: { type: 'backspace' }, variant: 'function' },
+  { label: '%', name: 'Percent', action: { type: 'percent' }, variant: 'function' },
+  operator('÷', 'Divide', 'divide'),
+  { label: '√', name: 'Square root', action: { type: 'sqrt' }, variant: 'function' },
+  operator('xʸ', 'Power', 'power'),
+  { label: '±', name: 'Toggle sign', action: { type: 'toggleSign' }, variant: 'function' },
+  operator('×', 'Multiply', 'multiply'),
+  digit('7'),
+  digit('8'),
+  digit('9'),
+  operator('−', 'Subtract', 'subtract'),
+  digit('4'),
+  digit('5'),
+  digit('6'),
+  operator('+', 'Add', 'add'),
+  digit('1'),
+  digit('2'),
+  digit('3'),
+  { label: '=', name: 'Equals', action: { type: 'equals' }, variant: 'operator', className: 'row-span-2' },
+  digit('0', 'col-span-2'),
+  { label: '.', name: 'Decimal point', action: { type: 'decimal' }, variant: 'digit' },
+]
+
+const VARIANT_STYLES: Record<Variant, string> = {
+  digit: 'bg-slate-700 text-white hover:bg-slate-600',
+  function: 'bg-slate-400 text-slate-950 hover:bg-slate-300',
+  operator: 'bg-amber-500 text-white hover:bg-amber-400',
+}
+
+const ACTIVE_OPERATOR_STYLE = 'bg-white text-amber-500'
+
+interface KeypadProps {
+  onPress: (action: CalculatorAction) => void
+  disabled: boolean
+  activeOperator: BinaryOperator | null
+}
+
+export function Keypad({ onPress, disabled, activeOperator }: KeypadProps) {
+  return (
+    <div className="grid auto-rows-[4rem] grid-cols-4 gap-3">
+      {KEYS.map(({ label, name, action, variant, className = '' }) => {
+        const isOperator = action.type === 'operator'
+        const isActive = isOperator && action.operator === activeOperator
+
+        return (
+          <button
+            key={name}
+            type="button"
+            aria-label={name}
+            aria-pressed={isOperator ? isActive : undefined}
+            // AC stays enabled so an in-flight calculation can be cancelled.
+            disabled={disabled && action.type !== 'clear'}
+            onClick={() => onPress(action)}
+            className={[
+              'rounded-2xl text-2xl font-medium transition select-none',
+              'focus-visible:ring-4 focus-visible:ring-sky-400 focus-visible:outline-none',
+              'active:scale-95 disabled:cursor-not-allowed disabled:opacity-50',
+              isActive ? ACTIVE_OPERATOR_STYLE : VARIANT_STYLES[variant],
+              className,
+            ].join(' ')}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
