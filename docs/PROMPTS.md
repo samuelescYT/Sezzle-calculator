@@ -64,6 +64,24 @@ I reviewed each stage (the diff summary, test results and coverage) before appro
 
 > Yes, commit and push it
 
+## 9. UX: traces for unary operations and instant percentage
+
+> Claude, there is a problem regarding UX, when the user press a unary operator like % or √, the number changes instantly and they lose track of what just happened. update the reducer logic:
+>
+> Add a "trace" concept to the state. when a unary operation runs, the UI should show a small trace above the main result explaining the transformation (e.g. showing √9 or 20%=), this trace should clear upon the next digit or operator
+>
+> Currently if a user types 80 + 20%, the screen shows 16 and waits for =. let's make it smarter. If there's a pending operation, hitting % should calculate the percentage AND inmediatly autoresolve the pending math. so 80 + 20% should instantly result in 96, leaving a trace of "80 + 20%=", update the test aswell
+
+**Result:**
+- **`trace` in the reducer state:** `√9`, `20% =`, `80 + 20% =`, `9 + √16`, `12 + 3 =`. It clears on the next digit, decimal point, sign change or operator.
+- **Derived small line:** the stored `expression` string was replaced by a selector that combines the pending operation with the trace.
+- **Instant percentage:** `%` with a pending operation now makes two chained API calls, `percentage(20, 80)` then `add(80, 16)`, and shows 96 right away.
+- **Tests:** reducer and integration tests updated, 164 tests in total.
+
+---
+
+## Commit history
+
 | Commit | Stage |
 |--------|-------|
 | `chore: scaffold Go backend and React frontend` | Scaffold |
@@ -72,4 +90,5 @@ I reviewed each stage (the diff summary, test results and coverage) before appro
 | `feat(frontend): add API client, calculator state machine and formatting` | Pure frontend logic |
 | `feat(frontend): add calculator UI with keyboard support` | Hook, components, integration tests |
 | `build: add Dockerfiles and docker compose setup` | Containers, nginx, race-enabled tests in the build |
-| `docs: add README, design rationale, coverage reports and prompts` | This documentation |
+| `docs: add README, design rationale, coverage reports and prompts` | Documentation |
+| `feat(frontend): add traces for unary steps and resolve pending math on %` | UX improvement (prompt 9) |

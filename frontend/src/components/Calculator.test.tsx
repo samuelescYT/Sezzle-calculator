@@ -96,18 +96,16 @@ describe('Calculator', () => {
     expect(screen.getByRole('button', { name: 'Add' })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('applies an Apple-style percentage after subtract', async () => {
+  it('resolves a pending addition as soon as % is pressed', async () => {
     const user = setup()
 
-    await click(user, '6', '0', 'Subtract', '3', '0', 'Percent')
-    await expectResult('18')
+    await click(user, '8', '0', 'Add', '2', '0', 'Percent')
 
-    await click(user, 'Equals')
-    await expectResult('42')
-    expect(expression()).toHaveTextContent('60 − 18 =')
+    await expectResult('96')
+    expect(expression()).toHaveTextContent('80 + 20% =')
     expect(calls()).toEqual([
-      ['percentage', 30, 60],
-      ['subtract', 60, 18],
+      ['percentage', 20, 80],
+      ['add', 80, 16],
     ])
   })
 
@@ -115,10 +113,33 @@ describe('Calculator', () => {
     const user = setup()
 
     await click(user, '6', '0', 'Multiply', '3', '0', 'Percent')
-    await expectResult('0.3')
-    await click(user, 'Equals')
 
     await expectResult('18')
+    expect(expression()).toHaveTextContent('60 × 30% =')
+    expect(calls()).toEqual([
+      ['percentage', 30, 1],
+      ['multiply', 60, 0.3],
+    ])
+  })
+
+  it('traces a standalone percentage', async () => {
+    const user = setup()
+
+    await click(user, '2', '0', 'Percent')
+
+    await expectResult('0.2')
+    expect(expression()).toHaveTextContent('20% =')
+  })
+
+  it('clears the trace on the next digit', async () => {
+    const user = setup()
+
+    await click(user, '2', '0', 'Percent')
+    await expectResult('0.2')
+    await click(user, '7')
+
+    expect(result()).toHaveTextContent('7')
+    expect(expression()).toHaveTextContent('')
   })
 
   it('evaluates chained operations left to right', async () => {
@@ -135,13 +156,26 @@ describe('Calculator', () => {
     ])
   })
 
-  it('computes a square root immediately', async () => {
+  it('computes a square root immediately and traces it', async () => {
     const user = setup()
 
     await click(user, '9', 'Square root')
 
     await expectResult('3')
+    expect(expression()).toHaveTextContent('√9')
     expect(calls()).toEqual([['sqrt', 9, undefined]])
+  })
+
+  it('keeps the square root visible as the second operand', async () => {
+    const user = setup()
+
+    await click(user, '9', 'Add', '1', '6', 'Square root')
+    await expectResult('4')
+    expect(expression()).toHaveTextContent('9 + √16')
+
+    await click(user, 'Equals')
+    await expectResult('13')
+    expect(expression()).toHaveTextContent('9 + √16 =')
   })
 
   it('hides floating point noise', async () => {

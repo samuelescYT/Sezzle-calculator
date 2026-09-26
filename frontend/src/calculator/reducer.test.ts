@@ -3,6 +3,7 @@ import {
   activeOperator,
   calculatorReducer,
   displayValue,
+  expressionLine,
   initialState,
   MAX_DIGITS,
   type BinaryOperator,
@@ -64,9 +65,10 @@ function requestOf(state: CalculatorState) {
 }
 
 describe('initial state', () => {
-  it('shows 0 and no expression', () => {
+  it('shows 0 and an empty expression line', () => {
     expect(displayValue(initialState)).toBe('0')
-    expect(initialState.expression).toBe('')
+    expect(expressionLine(initialState)).toBe('')
+    expect(initialState.trace).toBeNull()
     expect(initialState.request).toBeNull()
   })
 })
@@ -144,18 +146,20 @@ describe('toggle sign', () => {
 describe('binary operations', () => {
   it('shows the pending operation above the entry', () => {
     const state = press('12+')
-    expect(state.expression).toBe('12 +')
+    expect(expressionLine(state)).toBe('12 +')
     expect(displayValue(state)).toBe('12')
     expect(state.request).toBeNull()
   })
 
-  it('requests the operation on equals and shows the full expression', () => {
+  it('requests the operation on equals and traces the full expression', () => {
     const pending = press('12+3=')
     expect(requestOf(pending)).toEqual({ operation: 'add', a: 12, b: 3 })
 
     const done = resolve(pending, 15)
     expect(displayValue(done)).toBe('15')
-    expect(done.expression).toBe('12 + 3 =')
+    expect(done.trace).toBe('12 + 3 =')
+    expect(expressionLine(done)).toBe('12 + 3 =')
+    expect(done.pending).toBeNull()
     expect(done.request).toBeNull()
   })
 
@@ -166,13 +170,13 @@ describe('binary operations', () => {
     ['^', 'power', '^'],
   ])('maps %s to the %s operation', (key, operation, symbol) => {
     const state = press(`6${key}`)
-    expect(state.expression).toBe(`6 ${symbol}`)
+    expect(expressionLine(state)).toBe(`6 ${symbol}`)
     expect(requestOf(press('2=', state))).toEqual({ operation, a: 6, b: 2 })
   })
 
   it('replaces the operator when two are pressed in a row', () => {
     const state = press('5+*')
-    expect(state.expression).toBe('5 ×')
+    expect(expressionLine(state)).toBe('5 ×')
     expect(state.request).toBeNull()
     expect(requestOf(press('3=', state))).toEqual({ operation: 'multiply', a: 5, b: 3 })
   })
@@ -182,7 +186,7 @@ describe('binary operations', () => {
     expect(requestOf(state)).toEqual({ operation: 'add', a: 10, b: 10 })
 
     state = resolve(state, 20)
-    expect(state.expression).toBe('20 ^')
+    expect(expressionLine(state)).toBe('20 ^')
     expect(displayValue(state)).toBe('20')
 
     state = press('2=', state)
@@ -194,7 +198,7 @@ describe('binary operations', () => {
     const state = press('5+=')
     expect(state.request).toBeNull()
     expect(displayValue(state)).toBe('5')
-    expect(state.expression).toBe('5 =')
+    expect(expressionLine(state)).toBe('5 =')
   })
 
   it('ignores equals when nothing is pending', () => {
@@ -215,68 +219,168 @@ describe('binary operations', () => {
   it('starts a new calculation when typing after a result', () => {
     const state = press('7', resolve(press('12+3='), 15))
     expect(displayValue(state)).toBe('7')
-    expect(state.expression).toBe('')
+    expect(expressionLine(state)).toBe('')
   })
 
   it('continues from the result when an operator follows it', () => {
-    const state = press('*2=', resolve(press('12+3='), 15))
-    expect(requestOf(state)).toEqual({ operation: 'multiply', a: 15, b: 2 })
+    const state = press('*', resolve(press('12+3='), 15))
+    expect(expressionLine(state)).toBe('15 ×')
+    expect(requestOf(press('2=', state))).toEqual({ operation: 'multiply', a: 15, b: 2 })
   })
 
-  it('formats long results in the expression', () => {
+  it('formats long results', () => {
     const state = resolve(press('1/3='), 0.3333333333333333)
     expect(displayValue(state)).toBe('0.333333333333333')
-    expect(state.expression).toBe('1 ÷ 3 =')
+    expect(expressionLine(state)).toBe('1 ÷ 3 =')
   })
 })
 
 describe('percentage', () => {
-  it('takes a percentage of the left operand after subtract', () => {
+  it('is a plain fraction with nothing pending, traced as "x% ="', () => {
+    const state = press('20%')
+    expect(requestOf(state)).toEqual({ operation: 'percentage', a: 20, b: 1 })
+
+    const done = resolve(state, 0.2)
+    expect(displayValue(done)).toBe('0.2')
+    expect(expressionLine(done)).toBe('20% =')
+  })
+
+  it('resolves a pending addition immediately: 80 + 20% = 96', () => {
+    let state = press('80+20%')
+    expect(requestOf(state)).toEqual({ operation: 'percentage', a: 20, b: 80 })
+
+    // The percentage result feeds straight into the pending addition.
+    state = resolve(state, 16)
+    expect(requestOf(state)).toEqual({ operation: 'add', a: 80, b: 16 })
+
+    state = resolve(state, 96)
+    expect(state.request).toBeNull()
+    expect(state.pending).toBeNull()
+    expect(displayValue(state)).toBe('96')
+    expect(expressionLine(state)).toBe('80 + 20% =')
+  })
+
+  it('resolves a pending subtraction immediately: 60 − 30% = 42', () => {
     let state = press('60-30%')
     expect(requestOf(state)).toEqual({ operation: 'percentage', a: 30, b: 60 })
 
     state = resolve(state, 18)
-    expect(displayValue(state)).toBe('18')
-    expect(state.expression).toBe('60 −')
-
-    state = press('=', state)
     expect(requestOf(state)).toEqual({ operation: 'subtract', a: 60, b: 18 })
 
     state = resolve(state, 42)
     expect(displayValue(state)).toBe('42')
-    expect(state.expression).toBe('60 − 18 =')
+    expect(expressionLine(state)).toBe('60 − 30% =')
   })
 
-  it('takes a percentage of the left operand after add', () => {
-    expect(requestOf(press('60+30%'))).toEqual({ operation: 'percentage', a: 30, b: 60 })
+  it.each([
+    ['*', 'multiply', '×'],
+    ['/', 'divide', '÷'],
+    ['^', 'power', '^'],
+  ])('uses a plain fraction after %s and resolves the %s', (key, operation, symbol) => {
+    let state = press(`80${key}20%`)
+    expect(requestOf(state)).toEqual({ operation: 'percentage', a: 20, b: 1 })
+
+    state = resolve(state, 0.2)
+    expect(requestOf(state)).toEqual({ operation, a: 80, b: 0.2 })
+
+    state = resolve(state, 16)
+    expect(expressionLine(state)).toBe(`80 ${symbol} 20% =`)
   })
 
-  it.each(['*', '/', '^'])('is a plain fraction after %s', (key) => {
-    expect(requestOf(press(`60${key}30%`))).toEqual({ operation: 'percentage', a: 30, b: 1 })
+  it('uses the left operand when pressed right after an operator', () => {
+    const state = press('80+%')
+    expect(requestOf(state)).toEqual({ operation: 'percentage', a: 80, b: 80 })
+    expect(expressionLine(resolve(resolve(state, 64), 144))).toBe('80 + 80% =')
   })
 
-  it('is a plain fraction on its own', () => {
-    const state = press('50%')
-    expect(requestOf(state)).toEqual({ operation: 'percentage', a: 50, b: 1 })
-    expect(displayValue(resolve(state, 0.5))).toBe('0.5')
+  it('keeps the keypad busy between the two requests', () => {
+    const between = resolve(press('80+20%'), 16)
+    expect(between.request).not.toBeNull()
+    expect(press('5', between)).toBe(between)
   })
 
-  it('replaces the percentage when typing afterwards', () => {
-    const state = press('4', resolve(press('50%'), 0.5))
+  it('starts a new number when typing after the result', () => {
+    const state = press('4', resolve(resolve(press('80+20%'), 16), 96))
     expect(displayValue(state)).toBe('4')
+    expect(expressionLine(state)).toBe('')
+  })
+
+  it('continues from the result when an operator follows', () => {
+    const state = press('-', resolve(resolve(press('80+20%'), 16), 96))
+    expect(expressionLine(state)).toBe('96 −')
+  })
+
+  it('shows an error if the second request fails', () => {
+    const state = fail(resolve(press('80/0%'), 0), 'Cannot divide by zero')
+    expect(displayValue(state)).toBe('Cannot divide by zero')
+    expect(expressionLine(state)).toBe('')
   })
 })
 
 describe('square root', () => {
-  it('requests sqrt of the entry without a second operand', () => {
+  it('requests sqrt of the entry and traces it', () => {
     const state = press('9r')
     expect(requestOf(state)).toEqual({ operation: 'sqrt', a: 9, b: undefined })
-    expect(displayValue(resolve(state, 3))).toBe('3')
+
+    const done = resolve(state, 3)
+    expect(displayValue(done)).toBe('3')
+    expect(expressionLine(done)).toBe('√9')
   })
 
-  it('can be used as the second operand', () => {
-    const state = press('=', resolve(press('9+16r'), 4))
+  it('keeps the pending operation and shows the trace after it', () => {
+    const state = resolve(press('9+16r'), 4)
+    expect(displayValue(state)).toBe('4')
+    expect(expressionLine(state)).toBe('9 + √16')
+  })
+
+  it('uses the square root trace in the final expression', () => {
+    let state = press('=', resolve(press('9+16r'), 4))
     expect(requestOf(state)).toEqual({ operation: 'add', a: 9, b: 4 })
+
+    state = resolve(state, 13)
+    expect(displayValue(state)).toBe('13')
+    expect(expressionLine(state)).toBe('9 + √16 =')
+  })
+
+  it('traces a square root of a previous square root by its value', () => {
+    const state = resolve(press('r', resolve(press('16r'), 4)), 2)
+    expect(expressionLine(state)).toBe('√4')
+  })
+})
+
+describe('trace', () => {
+  const afterSqrt = () => resolve(press('9r'), 3)
+
+  it('clears on the next digit', () => {
+    const state = press('5', afterSqrt())
+    expect(state.trace).toBeNull()
+    expect(expressionLine(state)).toBe('')
+  })
+
+  it('clears on the decimal point', () => {
+    expect(press('.', afterSqrt()).trace).toBeNull()
+  })
+
+  it('clears on an operator and shows the pending operation instead', () => {
+    const state = press('+', afterSqrt())
+    expect(state.trace).toBeNull()
+    expect(expressionLine(state)).toBe('3 +')
+  })
+
+  it('clears when the sign of the traced value changes', () => {
+    const state = press('n', afterSqrt())
+    expect(displayValue(state)).toBe('-3')
+    expect(state.trace).toBeNull()
+  })
+
+  it('does not label the operand with a trace it no longer matches', () => {
+    const state = press('n=', resolve(press('9+16r'), 4))
+    expect(requestOf(state)).toEqual({ operation: 'add', a: 9, b: -4 })
+    expect(expressionLine(resolve(state, 5))).toBe('9 + -4 =')
+  })
+
+  it('clears on all clear', () => {
+    expect(press('c', afterSqrt()).trace).toBeNull()
   })
 })
 
@@ -314,7 +418,7 @@ describe('errors', () => {
     const state = fail(press('8/0='), 'Cannot divide by zero')
     expect(displayValue(state)).toBe('Cannot divide by zero')
     expect(state.pending).toBeNull()
-    expect(state.expression).toBe('')
+    expect(expressionLine(state)).toBe('')
   })
 
   it('starts over on the next digit', () => {
@@ -325,7 +429,7 @@ describe('errors', () => {
 
   it('starts from 0 when an operator follows an error', () => {
     const state = press('+', fail(press('8/0='), 'Cannot divide by zero'))
-    expect(state.expression).toBe('0 +')
+    expect(expressionLine(state)).toBe('0 +')
   })
 
   it('clears the error on clear', () => {

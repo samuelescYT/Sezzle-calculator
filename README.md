@@ -4,9 +4,9 @@ A calculator with a **React + TypeScript + Tailwind CSS** frontend and a **Go** 
 The frontend never does arithmetic itself: every operation is computed by the backend API.
 
 - **Operations:** addition, subtraction, multiplication, division, plus the optional exponentiation, square root and percentage.
-- **Frontend:** a classic calculator. The small line shows the pending expression (`60 −`) and the large line shows the number being typed or the result. It supports the keyboard, works on phones, is accessible, and shows errors in the display.
+- **Frontend:** a classic calculator. The small line shows the pending expression (`60 −`) or a trace of the last step (`√9`, `80 + 20% =`), and the large line shows the number being typed or the result. It supports the keyboard, works on phones, is accessible, and shows errors in the display.
 - **Backend:** one standard-library `net/http` service with strict input checking, a consistent JSON error format, structured logs and clean shutdown.
-- **Quality:** about 90 Go test cases and 149 frontend tests. Coverage is 100% on the backend's `internal/` packages and 100% of lines on the frontend.
+- **Quality:** about 90 Go test cases and 164 frontend tests. Coverage is 100% on the backend's `internal/` packages and 100% of lines on the frontend.
 
 ---
 
@@ -94,7 +94,7 @@ Coverage thresholds are set to 90% in `vite.config.ts`, and the coverage run fai
 | Layer                                          | Tests    | Statements | Branches | Functions | Lines |
 |------------------------------------------------|----------|-----------:|---------:|----------:|------:|
 | Backend `internal/calculator`, `internal/api`  | ~90 cases | 100%      | n/a      | 100%      | n/a   |
-| Frontend `src/`                                | 149      | 99.4%      | 98.5%    | 100%      | 100%  |
+| Frontend `src/`                                | 164      | 99.4%      | 98.6%    | 100%      | 100%  |
 
 `cmd/server/main.go` only wires things together (configuration, logger, server start and shutdown) and has no logic of its own, so it isn't unit tested. It is exercised by the Docker build and the smoke tests.
 
@@ -108,7 +108,7 @@ What the tests cover:
   - The reducer, which is pure logic with no React, tested with an exhaustive table of state changes.
   - Number formatting, the keyboard mapping, and the API client with `fetch` stubbed.
   - The presentational components.
-  - Full user flows with React Testing Library and `user-event` against a mocked API module. These include `60 − 30% = 42`, chained operations, errors, keys disabled while a request runs, `AC` cancelling it, and keyboard input.
+  - Full user flows with React Testing Library and `user-event` against a mocked API module. These include `80 + 20%` resolving to 96, traces for `%` and `√`, chained operations, errors, keys disabled while a request runs, `AC` cancelling it, and keyboard input.
 
 ---
 
@@ -205,17 +205,20 @@ curl -i -X POST http://localhost:8080/api/v1/calculate/modulo \
 
 It works like a classic pocket calculator. Each operation runs as soon as the next operator or `=` is pressed, strictly **left to right**.
 
-| Keys                | Display                        | API calls                                  |
+| Keys                | Small line / display           | API calls                                  |
 |---------------------|--------------------------------|--------------------------------------------|
 | `12 + 3 =`          | `12 + 3 =` / **15**            | `add(12, 3)`                               |
 | `2 + 3 × 4 =`       | `5 ×` then **20**              | `add(2, 3)`, `multiply(5, 4)`              |
-| `60 − 30 % =`       | `60 −` / 18, then **42**       | `percentage(30, 60)`, `subtract(60, 18)`   |
-| `60 × 30 % =`       | 0.3, then **18**               | `percentage(30, 1)`, `multiply(60, 0.3)`   |
-| `50 %`              | **0.5**                        | `percentage(50, 1)`                        |
-| `9 √`               | **3**                          | `sqrt(9)`                                  |
+| `80 + 20 %`         | `80 + 20% =` / **96**          | `percentage(20, 80)`, `add(80, 16)`        |
+| `60 × 30 %`         | `60 × 30% =` / **18**          | `percentage(30, 1)`, `multiply(60, 0.3)`   |
+| `20 %`              | `20% =` / **0.2**              | `percentage(20, 1)`                        |
+| `9 √`               | `√9` / **3**                   | `sqrt(9)`                                  |
+| `9 + 16 √ =`        | `9 + √16` / 4, then `9 + √16 =` / **13** | `sqrt(16)`, `add(9, 4)`          |
 | `8 ÷ 0 =`           | **Cannot divide by zero**      | `divide(8, 0)` → 422                       |
 
-- **Percentage works like Apple's calculator.** After `+` or `−`, `x%` means "x percent of the left-hand number" (`60 − 30%` means `60 − 18`). Everywhere else it means `x / 100`.
+- **Traces:** when `%` or `√` changes the number at once, the small line explains what happened (`√9`, `20% =`, `80 + 20% =`), so the user doesn't lose track. The trace clears on the next digit, decimal point, sign change or operator.
+- **Percentage works like Apple's calculator, and resolves at once.** After `+` or `−`, `x%` means "x percent of the left-hand number". Everywhere else it means `x / 100`. If an operation is pending, `%` completes it immediately: `80 + 20%` shows **96** without pressing `=`. That takes two chained API calls, `percentage(20, 80)` → 16, then `add(80, 16)`.
+- **Square root** replaces the current number but keeps any pending operation, so `9 + 16 √` shows `9 + √16`, and `=` finishes it as `9 + √16 =`.
 - **Operators:** pressing a second operator right after the first replaces it. `=` right after an operator ignores that operator (`5 + =` gives `5`). After a result, typing a digit starts a new calculation and pressing an operator continues from the result.
 - **Input rules:** a number can have at most 15 digits and one decimal point. `±` changes the sign, and `⌫` deletes the last digit.
 - **While a request is running:** every key except `AC` is disabled, and `AC` cancels the request.
@@ -293,7 +296,7 @@ It works like a classic pocket calculator. Each operation runs as soon as the ne
 
 **The frontend handles interaction; the backend does all the arithmetic.** The frontend only decides *which* operation to request and *when*. That keeps the backend as a simple, reliable math service and puts the interaction logic in one testable place.
 
-**A pure reducer that describes requests as data.** `src/calculator/reducer.ts` is a `useReducer` state machine with no React or network code. A key that needs the backend doesn't call it. Instead, the reducer stores a description of the call in state: `request: {id, operation, a, b, then}`. `then` says what to do with the result: carry on to the next operator, finish the `=` expression, or replace the number on screen after `%` or `√`. This means:
+**A pure reducer that describes requests as data.** `src/calculator/reducer.ts` is a `useReducer` state machine with no React or network code. A key that needs the backend doesn't call it. Instead, the reducer stores a description of the call in state: `request: {id, operation, a, b, then}`. `then` says what to do with the result: carry on to the next operator, finish the calculation and show its trace, replace the number on screen after `√`, or, for `80 + 20%`, use the percentage as the right-hand operand of a second request that resolves the pending operation. The small line above the result is derived by a selector from the pending operation plus a `trace` of the last step, so it never goes out of sync with the state. This means:
 - All calculator behavior, including *which* API call `%` makes, is tested as plain functions.
 - `useCalculator` only has to run whatever request the state describes and send back `requestSucceeded` or `requestFailed`.
 - **Request ids** make it safe to ignore a late response that arrives after `AC`.

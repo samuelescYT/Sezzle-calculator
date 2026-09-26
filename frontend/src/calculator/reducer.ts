@@ -40,9 +40,14 @@ interface PendingOperation {
 
 /** What to do with the result once the API answers. */
 type Continuation =
+  /** Carry the result forward as the left operand of `operator`. */
   | { type: 'chain'; operator: BinaryOperator }
-  | { type: 'equals'; expression: string }
-  | { type: 'replaceEntry' }
+  /** The result is final: show it and explain it with `trace`. */
+  | { type: 'resolve'; trace: string }
+  /** The result replaces the entry (√); any pending operation stays pending. */
+  | { type: 'unary'; trace: string }
+  /** The result (a percentage) becomes the right operand of `pending`, which is resolved next. */
+  | { type: 'resolvePending'; pending: PendingOperation; trace: string }
 
 export interface CalculationRequest {
   id: number
@@ -56,7 +61,12 @@ export interface CalculatorState {
   entry: string
   entryState: EntryState
   pending: PendingOperation | null
-  expression: string
+  /**
+   * Explains the last completed step (e.g. "√9", "20% =", "80 + 20% =") so a
+   * value that changed instantly stays understandable. Cleared by the next
+   * digit, operator or sign change.
+   */
+  trace: string | null
   request: CalculationRequest | null
   requestCount: number
   error: string | null
@@ -81,7 +91,7 @@ export const initialState: CalculatorState = {
   entry: '0',
   entryState: 'value',
   pending: null,
-  expression: '',
+  trace: null,
   request: null,
   requestCount: 0,
   error: null,
@@ -110,6 +120,15 @@ export function displayValue(state: CalculatorState): string {
   return state.entryState === 'typing' ? formatEntry(state.entry) : formatNumber(Number(state.entry))
 }
 
+/**
+ * Text for the small line above the result: the pending operation followed by
+ * the trace of the last step, e.g. "9 +" + "√16" → "9 + √16".
+ */
+export function expressionLine(state: CalculatorState): string {
+  const pending = state.pending ? describe(state.pending) : ''
+  return [pending, state.trace ?? ''].filter(Boolean).join(' ')
+}
+
 /** The operator waiting for its second operand, highlighted on the keypad. */
 export function activeOperator(state: CalculatorState): BinaryOperator | null {
   return state.entryState === 'awaiting' ? (state.pending?.operator ?? null) : null
@@ -130,14 +149,9 @@ function handleInput(state: CalculatorState, action: InputAction): CalculatorSta
     case 'equals':
       return pressEquals(state)
     case 'percent':
-      return startRequest(state, {
-        operation: 'percentage',
-        a: entryValue(state),
-        b: percentBase(state.pending),
-        then: { type: 'replaceEntry' },
-      })
+      return pressPercent(state)
     case 'sqrt':
-      return startRequest(state, { operation: 'sqrt', a: entryValue(state), then: { type: 'replaceEntry' } })
+      return pressSqrt(state)
   }
 }
 
@@ -166,7 +180,8 @@ function toggleSign(state: CalculatorState): CalculatorState {
     return startEntry(state, '-0')
   }
   const entry = state.entry.startsWith('-') ? state.entry.slice(1) : `-${state.entry}`
-  return { ...state, entry }
+  // The value no longer matches the trace that explained it.
+  return { ...state, entry, trace: null }
 }
 
 function backspace(state: CalculatorState): CalculatorState {
@@ -180,7 +195,7 @@ function pressOperator(state: CalculatorState, operator: BinaryOperator): Calcul
 
   // Two operators in a row: the last one wins.
   if (pending && state.entryState === 'awaiting') {
-    return { ...state, pending: { ...pending, operator }, expression: describe(pending.operand, operator) }
+    return { ...state, pending: { ...pending, operator } }
   }
 
   // A pending operation with a new operand: compute it, then continue with `operator`.
@@ -194,13 +209,7 @@ function pressOperator(state: CalculatorState, operator: BinaryOperator): Calcul
   }
 
   const operand = entryValue(state)
-  return {
-    ...state,
-    pending: { operand, operator },
-    entry: String(operand),
-    entryState: 'awaiting',
-    expression: describe(operand, operator),
-  }
+  return { ...state, pending: { operand, operator }, entry: String(operand), entryState: 'awaiting', trace: null }
 }
 
 function pressEquals(state: CalculatorState): CalculatorState {
@@ -214,35 +223,82 @@ function pressEquals(state: CalculatorState): CalculatorState {
       pending: null,
       entry: String(pending.operand),
       entryState: 'value',
-      expression: `${formatNumber(pending.operand)} =`,
+      trace: `${formatNumber(pending.operand)} =`,
     }
   }
 
-  const operand = entryValue(state)
   return startRequest(state, {
     operation: pending.operator,
     a: pending.operand,
-    b: operand,
-    then: { type: 'equals', expression: `${describe(pending.operand, pending.operator)} ${formatNumber(operand)} =` },
+    b: entryValue(state),
+    then: { type: 'resolve', trace: `${describe(pending)} ${operandLabel(state)} =` },
+  })
+}
+
+/**
+ * Apple-style percentage. After + or − it is a percentage of the left operand
+ * (80 + 20% → 80 + 16), otherwise a plain fraction (80 × 20% → 80 × 0.2). A
+ * pending operation is resolved right away: 80 + 20% shows 96.
+ */
+function pressPercent(state: CalculatorState): CalculatorState {
+  const { pending } = state
+  const value = entryValue(state)
+  const percent = `${formatNumber(value)}%`
+
+  if (!pending) {
+    return startRequest(state, {
+      operation: 'percentage',
+      a: value,
+      b: 1,
+      then: { type: 'resolve', trace: `${percent} =` },
+    })
+  }
+
+  const isRelative = pending.operator === 'add' || pending.operator === 'subtract'
+  return startRequest(state, {
+    operation: 'percentage',
+    a: value,
+    b: isRelative ? pending.operand : 1,
+    then: { type: 'resolvePending', pending, trace: `${describe(pending)} ${percent} =` },
+  })
+}
+
+function pressSqrt(state: CalculatorState): CalculatorState {
+  const value = entryValue(state)
+  return startRequest(state, {
+    operation: 'sqrt',
+    a: value,
+    then: { type: 'unary', trace: `√${formatNumber(value)}` },
   })
 }
 
 function applyResult(state: CalculatorState, request: CalculationRequest, result: number): CalculatorState {
+  const { then } = request
   const next: CalculatorState = { ...state, request: null, entry: String(result) }
-  switch (request.then.type) {
-    case 'chain': {
-      const { operator } = request.then
+
+  switch (then.type) {
+    case 'chain':
       return {
         ...next,
-        pending: { operand: result, operator },
+        pending: { operand: result, operator: then.operator },
         entryState: 'awaiting',
-        expression: describe(result, operator),
+        trace: null,
       }
-    }
-    case 'equals':
-      return { ...next, pending: null, entryState: 'value', expression: request.then.expression }
-    case 'replaceEntry':
-      return { ...next, entryState: 'value' }
+    case 'resolve':
+      return { ...next, pending: null, entryState: 'value', trace: then.trace }
+    case 'unary':
+      return { ...next, entryState: 'value', trace: then.trace }
+    case 'resolvePending':
+      // Second step of "80 + 20%": apply the pending operation to the percentage.
+      return startRequest(
+        { ...state, request: null },
+        {
+          operation: then.pending.operator,
+          a: then.pending.operand,
+          b: result,
+          then: { type: 'resolve', trace: then.trace },
+        },
+      )
   }
 }
 
@@ -251,18 +307,17 @@ function startRequest(state: CalculatorState, request: Omit<CalculationRequest, 
   return { ...state, requestCount: id, request: { id, ...request } }
 }
 
-/** Starts typing a new number; clears the old expression if nothing is pending. */
+/** Starts typing a new number, clearing the trace of the previous step. */
 function startEntry(state: CalculatorState, entry: string): CalculatorState {
-  return { ...state, entry, entryState: 'typing', expression: state.pending ? state.expression : '' }
+  return { ...state, entry, entryState: 'typing', trace: null }
 }
 
 /**
- * Apple-style percentage: after + or − it is a percentage of the left operand
- * (60 − 30% → 60 − 18); otherwise it is a plain fraction (30% → 0.3).
+ * How the right operand is written in the final trace: its unary trace when it
+ * came from √ (e.g. "9 + √16 ="), otherwise the number itself.
  */
-function percentBase(pending: PendingOperation | null): number {
-  if (pending && (pending.operator === 'add' || pending.operator === 'subtract')) return pending.operand
-  return 1
+function operandLabel(state: CalculatorState): string {
+  return state.trace ?? formatNumber(entryValue(state))
 }
 
 function entryValue(state: CalculatorState): number {
@@ -273,6 +328,6 @@ function countDigits(entry: string): number {
   return entry.replace(/\D/g, '').length
 }
 
-function describe(operand: number, operator: BinaryOperator): string {
+function describe({ operand, operator }: PendingOperation): string {
   return `${formatNumber(operand)} ${OPERATOR_SYMBOLS[operator]}`
 }

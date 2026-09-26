@@ -2,7 +2,7 @@ import { useEffect, useReducer } from 'react'
 import { calculate } from '../api/calculatorApi'
 import { formatError } from '../calculator/format'
 import { keyToAction } from '../calculator/keyboard'
-import { activeOperator, calculatorReducer, displayValue, initialState } from '../calculator/reducer'
+import { activeOperator, calculatorReducer, displayValue, expressionLine, initialState } from '../calculator/reducer'
 
 /**
  * Wires the pure calculator reducer to the outside world: it runs the API
@@ -42,7 +42,7 @@ export function useCalculator() {
 
   return {
     dispatch,
-    expression: state.expression,
+    expression: expressionLine(state),
     display: displayValue(state),
     isError: state.error !== null,
     isBusy: request !== null,
