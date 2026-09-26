@@ -78,6 +78,39 @@ I reviewed each stage (the diff summary, test results and coverage) before appro
 - **Instant percentage:** `%` with a pending operation now makes two chained API calls, `percentage(20, 80)` then `add(80, 16)`, and shows 96 right away.
 - **Tests:** reducer and integration tests updated, 164 tests in total.
 
+## 10. Operation history and Sezzle brand polish
+
+> Great job, commit and push it, let's add one more UX feature: An operation history and for the UI we'll polish the UI to match sezzle's brand identity
+>
+> - Whenever a final result is calculated, either by pressing equals or auto-resolved, save the full equation string to a history array. persist this array in the browser's local storage
+>
+> - Cap the history at the last 20 operations, when a new one is added, the oldest one should drop off
+>
+> - Add a subtle history/clock SVG icon button near the top left of the calculator display area to toggle the history panel
+>
+> - For the mobile UX, the history panel should act as an overlay that completely covers the keypad area, but leaves the main display visible
+>
+> - On desktop, opening the history should NOT cover the keypad. Instead the main calculator card should expand horizontally, a side by side layout, calculator on the left, history panel on the right with a subtle vertical divider
+>
+> - Inside the history panel, each item should be right aligned, show the equation string and the final result below
+>
+> - A clear history button should be added aswell, to wipe the localStorage and the state, write the necessary test
+>
+> Regarding the UI polish
+>
+> - I have placed the official sezzle's logo at sezzle-logo.svg in the public folder, place this logo centered just above the calculator display area, sized acordingly to the device you're on
+>
+> - Upgrade the UI to a premium dark brand vibe matching the icon's background. Use bg-[#1A0B2E] for the main page background and bg-[#2D1144] for the calculator card
+>
+> - Use Sezzle's brand colors for accents and buttons: Primary Purple (#8333D4), Coral/Pink (#FF5667), Green (#00B874), and Orange (#FF5B00). For example, make operator buttons purple and the equals button green or coral. Keep number buttons in sleek dark tones with soft rounded corners
+
+**Result:**
+- **History logic:** a pure history module (cap of 20, validated `localStorage` load and save) and a `useHistory` hook. Final results are recorded through an `onCalculated` callback on `useCalculator`, using a pure `finalExpression` helper in the reducer.
+- **UI:** a history toggle (clock icon, `aria-expanded`) and a history panel.
+- **Layout:** one CSS grid. On phones the panel covers the keypad's cell exactly; on desktop it becomes a side column behind a divider, and the calculator column keeps its width.
+- **Brand:** Sezzle palette as Tailwind theme tokens, the logo inside the `<h1>`, the Sezzle icon as favicon, and a dark text on the green equals key for contrast.
+- **Tests:** 197 in total, including clearing history from both the state and `localStorage`.
+
 ---
 
 ## Commit history
@@ -92,3 +125,4 @@ I reviewed each stage (the diff summary, test results and coverage) before appro
 | `build: add Dockerfiles and docker compose setup` | Containers, nginx, race-enabled tests in the build |
 | `docs: add README, design rationale, coverage reports and prompts` | Documentation |
 | `feat(frontend): add traces for unary steps and resolve pending math on %` | UX improvement (prompt 9) |
+| `feat(frontend): add persisted operation history and Sezzle brand styling` | History panel and brand polish (prompt 10) |

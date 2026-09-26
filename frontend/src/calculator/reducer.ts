@@ -129,6 +129,14 @@ export function expressionLine(state: CalculatorState): string {
   return [pending, state.trace ?? ''].filter(Boolean).join(' ')
 }
 
+/**
+ * The full equation a request completes (e.g. "80 + 20% ="), or null when its
+ * result is an intermediate step such as √ or a chained operation.
+ */
+export function finalExpression(request: CalculationRequest): string | null {
+  return request.then.type === 'resolve' ? request.then.trace : null
+}
+
 /** The operator waiting for its second operand, highlighted on the keypad. */
 export function activeOperator(state: CalculatorState): BinaryOperator | null {
   return state.entryState === 'awaiting' ? (state.pending?.operator ?? null) : null

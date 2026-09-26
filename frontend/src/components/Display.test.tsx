@@ -19,7 +19,7 @@ describe('Display', () => {
   it('highlights errors', () => {
     render(<Display expression="" value="Cannot divide by zero" isError />)
 
-    expect(screen.getByLabelText('Result')).toHaveClass('text-rose-400')
+    expect(screen.getByLabelText('Result')).toHaveClass('text-sezzle-coral')
   })
 
   it('shrinks long values', () => {
@@ -28,5 +28,13 @@ describe('Display', () => {
 
     rerender(<Display expression="" value="1,234,567,890,123" isError={false} />)
     expect(screen.getByLabelText('Result')).toHaveClass('text-3xl')
+  })
+})
+
+describe('Display leading control', () => {
+  it('renders the leading control when provided', () => {
+    render(<Display expression="" value="0" isError={false} leading={<button type="button">History</button>} />)
+
+    expect(screen.getByRole('button', { name: 'History' })).toBeInTheDocument()
   })
 })

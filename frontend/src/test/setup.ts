@@ -4,4 +4,6 @@ import { afterEach } from 'vitest'
 
 afterEach(() => {
   cleanup()
+  // History is persisted; keep tests independent.
+  localStorage.clear()
 })

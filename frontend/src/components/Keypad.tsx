@@ -1,6 +1,6 @@
 import type { BinaryOperator, CalculatorAction, Digit } from '../calculator/reducer'
 
-type Variant = 'digit' | 'function' | 'operator'
+type Variant = 'digit' | 'function' | 'operator' | 'equals' | 'clear'
 
 interface KeyDefinition {
   label: string
@@ -27,7 +27,7 @@ const operator = (label: string, name: string, value: BinaryOperator): KeyDefini
 
 /** Keys in visual order for a 4-column grid. */
 const KEYS: KeyDefinition[] = [
-  { label: 'AC', name: 'All clear', action: { type: 'clear' }, variant: 'function' },
+  { label: 'AC', name: 'All clear', action: { type: 'clear' }, variant: 'clear' },
   { label: '⌫', name: 'Backspace', action: { type: 'backspace' }, variant: 'function' },
   { label: '%', name: 'Percent', action: { type: 'percent' }, variant: 'function' },
   operator('÷', 'Divide', 'divide'),
@@ -46,18 +46,22 @@ const KEYS: KeyDefinition[] = [
   digit('1'),
   digit('2'),
   digit('3'),
-  { label: '=', name: 'Equals', action: { type: 'equals' }, variant: 'operator', className: 'row-span-2' },
+  { label: '=', name: 'Equals', action: { type: 'equals' }, variant: 'equals', className: 'row-span-2' },
   digit('0', 'col-span-2'),
   { label: '.', name: 'Decimal point', action: { type: 'decimal' }, variant: 'digit' },
 ]
 
+/** Sezzle palette: purple operators, green equals, coral for clearing, dark digits. */
 const VARIANT_STYLES: Record<Variant, string> = {
-  digit: 'bg-slate-700 text-white hover:bg-slate-600',
-  function: 'bg-slate-400 text-slate-950 hover:bg-slate-300',
-  operator: 'bg-amber-500 text-white hover:bg-amber-400',
+  digit: 'bg-white/[0.06] text-white hover:bg-white/[0.12]',
+  function: 'bg-white/[0.14] text-purple-100 hover:bg-white/20',
+  clear: 'bg-white/[0.14] text-sezzle-coral hover:bg-white/20',
+  operator: 'bg-sezzle-purple text-white hover:bg-sezzle-purple/85',
+  // Dark text: white on this green would fall below WCAG contrast for text.
+  equals: 'bg-sezzle-green text-sezzle-night hover:bg-sezzle-green/85',
 }
 
-const ACTIVE_OPERATOR_STYLE = 'bg-white text-amber-500'
+const ACTIVE_OPERATOR_STYLE = 'bg-white text-sezzle-purple'
 
 interface KeypadProps {
   onPress: (action: CalculatorAction) => void
@@ -83,7 +87,7 @@ export function Keypad({ onPress, disabled, activeOperator }: KeypadProps) {
             onClick={() => onPress(action)}
             className={[
               'rounded-2xl text-2xl font-medium transition select-none',
-              'focus-visible:ring-4 focus-visible:ring-sky-400 focus-visible:outline-none',
+              'focus-visible:ring-4 focus-visible:ring-sezzle-orange focus-visible:outline-none',
               'active:scale-95 disabled:cursor-not-allowed disabled:opacity-50',
               isActive ? ACTIVE_OPERATOR_STYLE : VARIANT_STYLES[variant],
               className,

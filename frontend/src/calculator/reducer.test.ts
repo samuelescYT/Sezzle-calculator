@@ -4,6 +4,7 @@ import {
   calculatorReducer,
   displayValue,
   expressionLine,
+  finalExpression,
   initialState,
   MAX_DIGITS,
   type BinaryOperator,
@@ -451,5 +452,33 @@ describe('activeOperator', () => {
 
   it('is null with nothing pending', () => {
     expect(activeOperator(initialState)).toBeNull()
+  })
+})
+
+describe('finalExpression', () => {
+  const requestFor = (state: CalculatorState) => {
+    if (!state.request) throw new Error('no request in flight')
+    return state.request
+  }
+
+  it('is the full equation for "="', () => {
+    expect(finalExpression(requestFor(press('12+3=')))).toBe('12 + 3 =')
+  })
+
+  it('is the full equation for the request that auto-resolves a percentage', () => {
+    const second = resolve(press('80+20%'), 16)
+    expect(finalExpression(requestFor(second))).toBe('80 + 20% =')
+  })
+
+  it('is the equation for a standalone percentage', () => {
+    expect(finalExpression(requestFor(press('20%')))).toBe('20% =')
+  })
+
+  it.each([
+    ['the percentage step of 80 + 20%', '80+20%'],
+    ['a square root', '9r'],
+    ['a chained operation', '2+3*'],
+  ])('is null for %s', (_, sequence) => {
+    expect(finalExpression(requestFor(press(sequence)))).toBeNull()
   })
 })

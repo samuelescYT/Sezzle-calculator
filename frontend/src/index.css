@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+/* Sezzle brand palette, available as utilities such as bg-sezzle-purple. */
+@theme {
+  --color-sezzle-night: #1a0b2e;
+  --color-sezzle-plum: #2d1144;
+  --color-sezzle-purple: #8333d4;
+  --color-sezzle-coral: #ff5667;
+  --color-sezzle-green: #00b874;
+  --color-sezzle-orange: #ff5b00;
+}

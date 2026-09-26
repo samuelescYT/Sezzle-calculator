@@ -1,7 +1,8 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, calculate, type Operation } from '../api/calculatorApi'
+import { HISTORY_STORAGE_KEY } from '../history/history'
 import { Calculator } from './Calculator'
 
 vi.mock('../api/calculatorApi', async (importOriginal) => ({
@@ -274,6 +275,106 @@ describe('Calculator', () => {
       await user.keyboard('{Enter}')
 
       expect(result()).toHaveTextContent('5')
+    })
+  })
+
+  describe('history', () => {
+    const openHistory = (user: UserEvent) => click(user, 'Show history')
+    const historyPanel = () => screen.getByRole('region', { name: 'History' })
+    const historyItems = () => within(historyPanel()).queryAllByRole('listitem').map((item) => item.textContent)
+    const saved = () => JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) ?? 'null')
+
+    it('is hidden until the toggle is pressed', async () => {
+      const user = setup()
+      const toggle = screen.getByRole('button', { name: 'Show history' })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByRole('region', { name: 'History' })).not.toBeInTheDocument()
+
+      await openHistory(user)
+
+      expect(screen.getByRole('button', { name: 'Hide history' })).toHaveAttribute('aria-expanded', 'true')
+      expect(historyPanel()).toBeInTheDocument()
+
+      await click(user, 'Hide history')
+      expect(screen.queryByRole('region', { name: 'History' })).not.toBeInTheDocument()
+    })
+
+    it('records results from equals and auto-resolved percentages, newest first', async () => {
+      const user = setup()
+
+      await click(user, '1', '2', 'Add', '3', 'Equals')
+      await expectResult('15')
+      await click(user, '8', '0', 'Add', '2', '0', 'Percent')
+      await expectResult('96')
+      await openHistory(user)
+
+      expect(historyItems()).toEqual(['80 + 20% =96', '12 + 3 =15'])
+      expect(saved()).toEqual([
+        { expression: '12 + 3 =', result: 15 },
+        { expression: '80 + 20% =', result: 96 },
+      ])
+    })
+
+    it('does not record intermediate steps or failed calculations', async () => {
+      const user = setup()
+
+      await click(user, '9', 'Square root')
+      await expectResult('3')
+      await click(user, 'Add', '2', 'Multiply')
+      await waitFor(() => expect(expression()).toHaveTextContent('5 ×'))
+      await click(user, 'All clear', '8', 'Divide', '0', 'Equals')
+      await expectResult('Cannot divide by zero')
+      await openHistory(user)
+
+      expect(screen.getByText('No calculations yet')).toBeInTheDocument()
+      expect(saved()).toBeNull()
+    })
+
+    it('restores the saved history on the next visit', async () => {
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify([{ expression: '2 + 2 =', result: 4 }]))
+      const user = setup()
+
+      await openHistory(user)
+
+      expect(historyItems()).toEqual(['2 + 2 =4'])
+    })
+
+    it('clears the history from the panel and from localStorage', async () => {
+      const user = setup()
+      await click(user, '1', 'Add', '1', 'Equals')
+      await expectResult('2')
+      await openHistory(user)
+      expect(historyItems()).toEqual(['1 + 1 =2'])
+      expect(saved()).not.toBeNull()
+
+      await click(user, 'Clear history')
+
+      expect(historyItems()).toEqual([])
+      expect(screen.getByText('No calculations yet')).toBeInTheDocument()
+      expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull()
+    })
+
+    it('ignores a result that arrives after All clear', async () => {
+      let respond: (value: number) => void = () => {}
+      calculateMock.mockImplementation(() => new Promise((resolve) => (respond = resolve)))
+      const user = setup()
+
+      await click(user, '2', 'Add', '3', 'Equals', 'All clear')
+      await act(async () => respond(5))
+      await openHistory(user)
+
+      expect(result()).toHaveTextContent('0')
+      expect(screen.getByText('No calculations yet')).toBeInTheDocument()
+    })
+
+    it('keeps the display visible and the calculator usable while open', async () => {
+      const user = setup()
+      await openHistory(user)
+
+      await user.keyboard('6*7{Enter}')
+
+      await expectResult('42')
+      expect(historyItems()).toEqual(['6 × 7 =42'])
     })
   })
 })

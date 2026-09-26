@@ -4,9 +4,9 @@ A calculator with a **React + TypeScript + Tailwind CSS** frontend and a **Go** 
 The frontend never does arithmetic itself: every operation is computed by the backend API.
 
 - **Operations:** addition, subtraction, multiplication, division, plus the optional exponentiation, square root and percentage.
-- **Frontend:** a classic calculator. The small line shows the pending expression (`60 −`) or a trace of the last step (`√9`, `80 + 20% =`), and the large line shows the number being typed or the result. It supports the keyboard, works on phones, is accessible, and shows errors in the display.
+- **Frontend:** a classic calculator. The small line shows the pending expression (`60 −`) or a trace of the last step (`√9`, `80 + 20% =`), and the large line shows the number being typed or the result. It keeps a history of the last 20 calculations in `localStorage`, supports the keyboard, works on phones, is accessible, shows errors in the display, and uses Sezzle's brand colors and logo.
 - **Backend:** one standard-library `net/http` service with strict input checking, a consistent JSON error format, structured logs and clean shutdown.
-- **Quality:** about 90 Go test cases and 164 frontend tests. Coverage is 100% on the backend's `internal/` packages and 100% of lines on the frontend.
+- **Quality:** about 90 Go test cases and 197 frontend tests. Coverage is 100% on the backend's `internal/` packages and 100% of lines on the frontend.
 
 ---
 
@@ -94,7 +94,7 @@ Coverage thresholds are set to 90% in `vite.config.ts`, and the coverage run fai
 | Layer                                          | Tests    | Statements | Branches | Functions | Lines |
 |------------------------------------------------|----------|-----------:|---------:|----------:|------:|
 | Backend `internal/calculator`, `internal/api`  | ~90 cases | 100%      | n/a      | 100%      | n/a   |
-| Frontend `src/`                                | 164      | 99.4%      | 98.6%    | 100%      | 100%  |
+| Frontend `src/`                                | 197      | 99.5%      | 98.9%    | 100%      | 100%  |
 
 `cmd/server/main.go` only wires things together (configuration, logger, server start and shutdown) and has no logic of its own, so it isn't unit tested. It is exercised by the Docker build and the smoke tests.
 
@@ -107,8 +107,9 @@ What the tests cover:
 - **Frontend**
   - The reducer, which is pure logic with no React, tested with an exhaustive table of state changes.
   - Number formatting, the keyboard mapping, and the API client with `fetch` stubbed.
+  - The history module: the cap of 20, and loading and saving that survive corrupt, tampered or blocked `localStorage`.
   - The presentational components.
-  - Full user flows with React Testing Library and `user-event` against a mocked API module. These include `80 + 20%` resolving to 96, traces for `%` and `√`, chained operations, errors, keys disabled while a request runs, `AC` cancelling it, and keyboard input.
+  - Full user flows with React Testing Library and `user-event` against a mocked API module. These include `80 + 20%` resolving to 96, traces for `%` and `√`, chained operations, errors, keys disabled while a request runs, `AC` cancelling it, keyboard input, and history: recording, restoring, clearing, and ignoring intermediate steps, errors and responses that arrive after `AC`.
 
 ---
 
@@ -223,6 +224,7 @@ It works like a classic pocket calculator. Each operation runs as soon as the ne
 - **Input rules:** a number can have at most 15 digits and one decimal point. `±` changes the sign, and `⌫` deletes the last digit.
 - **While a request is running:** every key except `AC` is disabled, and `AC` cancels the request.
 - **Keyboard:** `0–9`, `.`, `+ - * / ^ %`, `Enter` or `=`, `Backspace`, `Escape` or `Delete` (clears everything).
+- **History:** the clock icon at the top left of the display opens the last 20 final results (from `=` or an auto-resolved `%`), newest first, with the equation above each result. They're saved in `localStorage`, so they survive a reload, and **Clear** wipes both the list and the stored copy. On a phone the panel covers the keypad and leaves the display visible. On wider screens the card widens and the history appears beside the calculator, behind a divider.
 
 ---
 
@@ -238,8 +240,10 @@ It works like a classic pocket calculator. Each operation runs as soon as the ne
 ├── frontend/
 │   ├── src/api/calculatorApi.ts    # typed fetch client and ApiError
 │   ├── src/calculator/             # pure logic: reducer (state machine), formatting, keyboard mapping
-│   ├── src/hooks/useCalculator.ts  # side effects: runs API calls, keyboard listener
-│   ├── src/components/             # Calculator (container), Display and Keypad (presentational)
+│   ├── src/history/                # pure logic: history cap and safe localStorage load/save
+│   ├── src/hooks/                  # useCalculator (API calls, keyboard), useHistory (state + persistence)
+│   ├── src/components/             # Calculator (layout); Display, Keypad, HistoryPanel, HistoryToggle (presentational)
+│   ├── public/                     # Sezzle logo and icon
 │   ├── nginx.conf                  # production static server + /api proxy
 │   └── Dockerfile
 ├── docs/
@@ -307,13 +311,34 @@ It works like a classic pocket calculator. Each operation runs as soon as the ne
 
 **Formatting.** Results are shown with up to 15 significant digits, thousands separators, and exponent notation outside 1e-7 to 1e15. The number being typed is shown as typed, so `0.50` stays `0.50`. Chained calculations use the full-precision value, not the rounded one on screen.
 
+**History.**
+- **The reducer stays unaware of history.** It exposes one pure helper, `finalExpression(request)`, which returns `"80 + 20% ="` for a request that completes a calculation and `null` for intermediate steps (`√`, chained operations, the percentage step of `80 + 20%`).
+- **`useCalculator` accepts an `onCalculated` callback** and calls it when such a request succeeds. It's wrapped in React's `useEffectEvent`, so passing a new callback never re-runs, and so never aborts, the request effect. Results that arrive after `AC` are ignored.
+- **The rest lives in its own layer.** `src/history/history.ts` has pure functions: append with a cap of 20, plus load and save. `useHistory` adds React state and writes to `localStorage` in an effect.
+- **Stored data is treated as untrusted.** Missing, corrupt or tampered data is validated entry by entry and capped. If storage is blocked or full, history still works for the session.
+
+**Responsive layout from a single grid.** The display and keypad are grid items.
+- **On phones**, the history panel is placed in the *same grid cell* as the keypad, so it covers the keypad exactly and the display stays visible. This was checked pixel for pixel.
+- **From the `md` breakpoint**, the panel moves to a second column spanning both rows. The card widens from `24rem` to `43.5rem`, and the calculator column stays exactly the same width.
+- **The panel's content is absolutely positioned,** so a long history scrolls inside the panel instead of stretching the layout.
+
+**Brand.**
+- **Theme tokens:** Sezzle's palette is defined once as Tailwind `@theme` tokens (`sezzle-night #1A0B2E` page, `sezzle-plum #2D1144` card, `sezzle-purple #8333D4`, `sezzle-coral #FF5667`, `sezzle-green #00B874`, `sezzle-orange #FF5B00`) and used as utilities such as `bg-sezzle-purple`. That's instead of repeating hex values across components.
+- **Colors by role:**
+  - operators: purple;
+  - equals: green, with **dark** text, because white on that green is only about 2.6:1 contrast, below the WCAG minimum;
+  - AC, errors and Clear: coral;
+  - focus rings: orange;
+  - digits: translucent dark tones.
+
 **Accessibility and responsiveness.**
 - Every key has an `aria-label`, the result is an `<output aria-live="polite">`, and the pending operator uses `aria-pressed`.
+- The history toggle uses `aria-expanded`/`aria-controls`, and the panel is a labelled region.
+- The logo sits inside the `<h1>`, whose accessible name is "Sezzle Calculator".
 - Keyboard focus is visible, and the full keyboard is supported. Pressing `Enter` doesn't also click whichever key has focus.
-- The calculator is a `max-w-sm` card that fills the width on phones.
 
 **Testing approach.**
-- **Most tests are for pure functions** (reducer, formatting, keyboard mapping, API client). They're fast and exhaustive.
+- **Most tests are for pure functions** (reducer, formatting, keyboard mapping, history, API client). They're fast and exhaustive.
 - **A smaller set of integration tests** renders `<Calculator />` with the API module mocked (`vi.mock`) by a fake backend that does real arithmetic, and drives it with `user-event` exactly as a user would.
 
 ### Cross-cutting
@@ -333,7 +358,8 @@ It works like a classic pocket calculator. Each operation runs as soon as the ne
 - **Percentage** follows Apple's convention described above. On the API, `percentage` always means "a% of b". The frontend sends `b = 1` when it wants a plain `a / 100`.
 - **Precision:** float64 arithmetic. The display rounds to 15 significant digits.
 - **Input limits:** typed numbers are limited to 15 digits. The API accepts any finite float64.
-- **Not in scope:** authentication, rate limiting, calculation history and persistence. The service is stateless.
+- **History is stored only in this browser.** It's saved in `localStorage` for this browser and device, and isn't synced to the backend.
+- **Not in scope:** authentication, rate limiting and server-side persistence. The service is stateless.
 - **Plain-text router responses:** Go's router returns plain text for 404s on unknown paths and for 405s (method not allowed). Every response from our own handler, including unknown operations, uses the JSON error format.
 - **Local race detector:** `go test -race` needs CGO. On a machine without a C compiler, use the Docker build.
 
