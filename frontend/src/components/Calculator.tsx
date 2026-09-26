@@ -30,7 +30,7 @@ function isSideBySide(): boolean {
  */
 export function Calculator() {
   const history = useHistory()
-  const { dispatch, expression, display, isError, isBusy, activeOperator } = useCalculator({
+  const { dispatch, expression, display, isTyping, isError, isBusy, activeOperator } = useCalculator({
     onCalculated: history.add,
   })
   const [isHistoryOpen, setHistoryOpen] = useState(false)
@@ -46,7 +46,7 @@ export function Calculator() {
       aria-label="Calculator"
       aria-busy={isBusy}
       className={[
-        'flex h-dvh w-full flex-col bg-sezzle-plum p-4',
+        'flex h-dvh w-full flex-col bg-sezzle-plum p-4 motion-safe:animate-card-in',
         // From sm the card is translucent, letting the brand glow through. It must not use
         // backdrop-filter itself, or the history panel's blur could no longer see the glow.
         'sm:h-[min(42rem,calc(100dvh-2rem))] sm:min-h-[32rem] sm:max-w-sm sm:rounded-3xl sm:bg-sezzle-plum/60 sm:p-5',
@@ -68,6 +68,8 @@ export function Calculator() {
           className="col-start-1 row-start-1"
           expression={expression}
           value={display}
+          // Stable while typing, so only new results, operands and errors animate.
+          valueKey={isTyping ? 'typing' : display}
           isError={isError}
           leading={
             <HistoryToggle
@@ -95,6 +97,8 @@ export function Calculator() {
               'z-10 rounded-2xl border border-white/10 bg-sezzle-plum/60 p-4 backdrop-blur-xl md:bg-sezzle-plum/35',
               // Below md: covers the keypad. md and up: a full-height side column.
               'col-start-1 row-start-2 md:col-start-2 md:row-span-2 md:row-start-1',
+              // Enters like a sheet over the keypad on phones, slides in beside it on desktop.
+              'motion-safe:animate-sheet-up md:motion-safe:animate-panel-in',
             ].join(' ')}
           />
         )}

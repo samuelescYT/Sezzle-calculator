@@ -65,6 +65,7 @@ export function useCalculator({ onCalculated }: UseCalculatorOptions = {}) {
     dispatch,
     expression: expressionLine(state),
     display: displayValue(state),
+    isTyping: state.entryState === 'typing' && state.error === null,
     isError: state.error !== null,
     isBusy: request !== null,
     activeOperator: activeOperator(state),

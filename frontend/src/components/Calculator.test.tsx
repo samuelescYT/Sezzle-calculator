@@ -87,6 +87,29 @@ describe('Calculator', () => {
     expect(result()).toHaveTextContent('3')
   })
 
+  it('animates new results but not every typed digit', async () => {
+    const user = setup()
+    const resultValue = () => screen.getByTestId('result-value')
+
+    await click(user, '1')
+    const typing = resultValue()
+    await click(user, '2')
+    expect(resultValue()).toBe(typing)
+
+    await click(user, 'Add', '3', 'Equals')
+    await expectResult('15')
+    expect(resultValue()).not.toBe(typing)
+  })
+
+  it('rotates the history icon while the panel is open', async () => {
+    const user = setup()
+    const icon = () => screen.getByRole('button', { name: /^(show|hide) history$/i }).querySelector('svg')
+
+    expect(icon()).not.toHaveClass('motion-safe:-rotate-45')
+    await click(user, 'Show history')
+    expect(icon()).toHaveClass('motion-safe:-rotate-45')
+  })
+
   it('highlights the pending operator', async () => {
     const user = setup()
 

@@ -4,9 +4,9 @@ A calculator with a **React + TypeScript + Tailwind CSS** frontend and a **Go** 
 The frontend never does arithmetic itself: every operation is computed by the backend API.
 
 - **Operations:** addition, subtraction, multiplication, division, plus the optional exponentiation, square root and percentage.
-- **Frontend:** a classic calculator. The small line shows the pending expression (`60 −`) or a trace of the last step (`√9`, `80 + 20% =`), and the large line shows the number being typed or the result. It keeps a history of the last 20 calculations in `localStorage` (tap one to bring it back), supports the keyboard, fills the screen on phones and fits short laptop screens without scrolling, is accessible, shows errors in the display, and uses Sezzle's brand colors and logo.
+- **Frontend:** a classic calculator. The small line shows the pending expression (`60 −`) or a trace of the last step (`√9`, `80 + 20% =`), and the large line shows the number being typed or the result. It keeps a history of the last 20 calculations in `localStorage` (tap one to bring it back), supports the keyboard, fills the screen on phones and fits short laptop screens without scrolling, is accessible, shows errors in the display, and uses Sezzle's brand colors and logo, with short, native-feeling animations.
 - **Backend:** one standard-library `net/http` service with strict input checking, a consistent JSON error format, structured logs and clean shutdown.
-- **Quality:** about 90 Go test cases and 210 frontend tests. Coverage is 100% on the backend's `internal/` packages and 100% of lines on the frontend.
+- **Quality:** about 90 Go test cases and 219 frontend tests. Coverage is 100% on the backend's `internal/` packages and 100% of lines on the frontend.
 
 ---
 
@@ -94,7 +94,7 @@ Coverage thresholds are set to 90% in `vite.config.ts`, and the coverage run fai
 | Layer                                          | Tests    | Statements | Branches | Functions | Lines |
 |------------------------------------------------|----------|-----------:|---------:|----------:|------:|
 | Backend `internal/calculator`, `internal/api`  | ~90 cases | 100%      | n/a      | 100%      | n/a   |
-| Frontend `src/`                                | 210      | 99.6%      | 98.9%    | 100%      | 100%  |
+| Frontend `src/`                                | 219      | 99.6%      | 99.0%    | 100%      | 100%  |
 
 `cmd/server/main.go` only wires things together (configuration, logger, server start and shutdown) and has no logic of its own, so it isn't unit tested. It is exercised by the Docker build and the smoke tests.
 
@@ -343,6 +343,20 @@ It works like a classic pocket calculator. Each operation runs as soon as the ne
   - AC, errors and Clear: coral;
   - focus rings: orange;
   - digits: translucent dark tones.
+
+**Motion.** Every animation is plain CSS through Tailwind: keyframes defined as `--animate-*` theme tokens in `index.css`, plus transition utilities. There's no animation library and no JavaScript timing.
+- **Snappy timing:** 150–240 ms with an ease-out curve (`--ease-snappy`).
+  - Keys shrink on press in 75 ms (`active:duration-75`) and spring back in 150 ms.
+  - Mobile browsers' grey tap flash is turned off.
+- **What animates:**
+  - the card fades in on load;
+  - new results pop in, the expression line fades, and errors shake;
+  - the history icon rotates when opened;
+  - the history panel slides up like a sheet over the keypad on phones, and slides in from the side on desktop;
+  - history entries follow in a 20 ms stagger, capped at 160 ms.
+- **Only meaningful changes animate.** The result is re-keyed only when it's a new result, operand or error, not on every typed digit. The `aria-live` region itself stays mounted, so screen reader announcements are unaffected.
+- **No flicker on fast requests.** The keypad is disabled for the few milliseconds a request takes. Its dimming is delayed by 200 ms (`disabled:delay-200`), so fast calculations never flicker, while a slow backend still shows a clear busy state. Re-enabling is instant.
+- **Reduced motion is respected.** Every animation uses `motion-safe:`, so users with "reduce motion" turned on get none. This was checked in the browser: no keyframe animations run.
 
 **Accessibility and responsiveness.**
 - Every key has an `aria-label`, the result is an `<output aria-live="polite">`, and the pending operator uses `aria-pressed`.

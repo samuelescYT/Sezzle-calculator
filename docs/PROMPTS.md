@@ -147,6 +147,17 @@ I reviewed each stage (the diff summary, test results and coverage) before appro
 - **Phones:** unchanged.
 - **Accessibility fix:** a new App test caught that the heading's accessible name was "SezzleCalculator"; the logo alt text is now "Sezzle Calculator".
 
+## 13. Native-feeling animations
+
+> yes well done, commit and push it. let's add the final touch, subtle animations, the feel of a native app using pure tailwindcss animations, animate the history panel on mobile and desktop and other UI elements but keep the snappy feel
+
+**Result:**
+- **Animation tokens:** CSS-only keyframe tokens in Tailwind `@theme`.
+- **What animates:** the card entrance, the result pop, the expression fade and the error shake; the history panel (a sheet on phones, a slide-in on desktop) with staggered entries; the rotating history icon; and a native-style key press.
+- **No flicker:** a delayed disabled state stops fast requests from dimming the keys.
+- **Reduced motion:** everything is gated behind `motion-safe:`.
+- **Tests:** 219 in total.
+
 ---
 
 ## Commit history
@@ -163,3 +174,4 @@ I reviewed each stage (the diff summary, test results and coverage) before appro
 | `feat(frontend): add traces for unary steps and resolve pending math on %` | UX improvement (prompt 9) |
 | `feat(frontend): add persisted operation history and Sezzle brand styling` | History panel and brand polish (prompt 10) |
 | `feat(frontend): restore from history, glass panel and viewport-fitted layout` | History interactions, responsive sizing and brand glow (prompts 11–12) |
+| `feat(frontend): add snappy native-feel animations` | Motion (prompt 13) |

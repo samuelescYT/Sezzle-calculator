@@ -13,6 +13,14 @@ interface HistoryPanelProps {
 
 const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-sezzle-orange focus-visible:outline-none'
 
+/** Entries appear one after another, but never more than ~160ms in total. */
+const STAGGER_MS = 20
+const MAX_STAGGERED = 8
+
+function staggerDelay(index: number): string {
+  return `${Math.min(index, MAX_STAGGERED) * STAGGER_MS}ms`
+}
+
 /**
  * Lists past calculations, newest first; picking one restores it. The content
  * is absolutely positioned, so the panel never grows its grid area: it takes
@@ -35,7 +43,8 @@ export function HistoryPanel({ id, entries, onSelect, onClear, disabled = false,
               disabled={entries.length === 0}
               aria-label="Clear history"
               className={[
-                'rounded-full px-3 py-1 text-sm font-medium text-sezzle-coral transition',
+                'rounded-full px-3 py-1 text-sm font-medium text-sezzle-coral transition duration-150 ease-out',
+                'motion-safe:active:scale-95 [-webkit-tap-highlight-color:transparent]',
                 'hover:bg-sezzle-coral/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
                 FOCUS_RING,
               ].join(' ')}
@@ -51,15 +60,21 @@ export function HistoryPanel({ id, entries, onSelect, onClear, disabled = false,
               {newestFirst.map((entry, index) => {
                 const result = formatNumber(entry.result)
                 return (
-                  <li key={entries.length - index}>
+                  <li
+                    key={entries.length - index}
+                    className="motion-safe:animate-item-in"
+                    style={{ animationDelay: staggerDelay(index) }}
+                  >
                     <button
                       type="button"
                       onClick={() => onSelect(entry)}
                       disabled={disabled}
                       aria-label={`${entry.expression} ${result}`}
                       className={[
-                        'w-full rounded-xl px-3 py-2 text-right transition',
-                        'hover:bg-white/10 active:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50',
+                        'w-full rounded-xl px-3 py-2 text-right transition duration-150 ease-out',
+                        'motion-safe:active:scale-[0.98] active:duration-75 [-webkit-tap-highlight-color:transparent]',
+                        'hover:bg-white/10 active:bg-white/15',
+                        'disabled:cursor-not-allowed disabled:opacity-50 disabled:delay-200',
                         FOCUS_RING,
                       ].join(' ')}
                     >

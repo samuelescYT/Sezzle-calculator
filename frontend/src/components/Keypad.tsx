@@ -86,9 +86,14 @@ export function Keypad({ onPress, disabled, activeOperator }: KeypadProps) {
             disabled={disabled && action.type !== 'clear'}
             onClick={() => onPress(action)}
             className={[
-              'rounded-2xl text-2xl font-medium transition select-none',
+              'rounded-2xl text-2xl font-medium select-none',
+              // Native-feeling press: quick to shrink (75ms), a little slower to spring back (150ms),
+              // and no grey tap flash on mobile browsers.
+              'touch-manipulation transition duration-150 ease-out [-webkit-tap-highlight-color:transparent]',
+              'motion-safe:active:scale-[0.94] active:duration-75',
               'focus-visible:ring-4 focus-visible:ring-sezzle-orange focus-visible:outline-none',
-              'active:scale-95 disabled:cursor-not-allowed disabled:opacity-50',
+              // Dim only if a request takes longer than 200ms, so fast calculations never flicker.
+              'disabled:cursor-not-allowed disabled:opacity-50 disabled:delay-200',
               isActive ? ACTIVE_OPERATOR_STYLE : VARIANT_STYLES[variant],
               className,
             ].join(' ')}

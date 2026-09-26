@@ -13,14 +13,15 @@ export function HistoryToggle({ isOpen, controls, onToggle }: HistoryToggleProps
       aria-controls={controls}
       onClick={onToggle}
       className={[
-        'rounded-full p-2 transition',
+        'rounded-full p-2 transition duration-150 ease-out [-webkit-tap-highlight-color:transparent]',
+        'motion-safe:active:scale-90',
         'focus-visible:ring-2 focus-visible:ring-sezzle-orange focus-visible:outline-none',
         isOpen ? 'bg-white/10 text-white' : 'text-purple-200/60 hover:bg-white/5 hover:text-white',
       ].join(' ')}
     >
       <svg
         viewBox="0 0 24 24"
-        className="size-5"
+        className={`size-5 transition-transform duration-200 ease-out ${isOpen ? 'motion-safe:-rotate-45' : ''}`}
         fill="none"
         stroke="currentColor"
         strokeWidth="2"

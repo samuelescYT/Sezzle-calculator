@@ -69,6 +69,16 @@ describe('HistoryPanel', () => {
     expect(onClear).toHaveBeenCalledOnce()
   })
 
+  it('staggers the entries in, capped so long histories still appear quickly', () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ expression: `${i} + 1 =`, result: i + 1 }))
+    renderPanel({ entries: many })
+
+    const delays = screen.getAllByRole('listitem').map((item) => item.style.animationDelay)
+    expect(delays.slice(0, 4)).toEqual(['0ms', '20ms', '40ms', '60ms'])
+    expect(new Set(delays.slice(8))).toEqual(new Set(['160ms']))
+    for (const item of screen.getAllByRole('listitem')) expect(item).toHaveClass('motion-safe:animate-item-in')
+  })
+
   it('is a labelled region that the toggle can control', () => {
     renderPanel()
 
