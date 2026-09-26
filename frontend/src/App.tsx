@@ -1,8 +1,10 @@
+import { BrandGlow } from './components/BrandGlow'
 import { Calculator } from './components/Calculator'
 
 function App() {
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-sezzle-night p-4 text-white">
+    <main className="relative isolate flex min-h-dvh items-center justify-center bg-sezzle-night text-white sm:p-4">
+      <BrandGlow />
       <Calculator />
     </main>
   )

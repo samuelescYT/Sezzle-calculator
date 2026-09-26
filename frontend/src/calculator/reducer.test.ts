@@ -482,3 +482,38 @@ describe('finalExpression', () => {
     expect(finalExpression(requestFor(press(sequence)))).toBeNull()
   })
 })
+
+describe('restore', () => {
+  const restore = (state: CalculatorState = initialState) =>
+    calculatorReducer(state, { type: 'restore', expression: '80 + 20% =', result: 96 })
+
+  it('shows the result explained by its equation, as right after calculating it', () => {
+    const state = restore(press('5+3'))
+    expect(displayValue(state)).toBe('96')
+    expect(expressionLine(state)).toBe('80 + 20% =')
+    expect(state.pending).toBeNull()
+    expect(state.request).toBeNull()
+  })
+
+  it('continues from the restored result with an operator', () => {
+    const state = press('+4=', restore())
+    expect(requestOf(state)).toEqual({ operation: 'add', a: 96, b: 4 })
+  })
+
+  it('starts a new number when a digit follows', () => {
+    const state = press('7', restore())
+    expect(displayValue(state)).toBe('7')
+    expect(expressionLine(state)).toBe('')
+  })
+
+  it('is ignored while a calculation is in flight', () => {
+    const inFlight = press('2+3=')
+    expect(restore(inFlight)).toBe(inFlight)
+  })
+
+  it('replaces an error', () => {
+    const state = restore(fail(press('8/0='), 'Cannot divide by zero'))
+    expect(state.error).toBeNull()
+    expect(displayValue(state)).toBe('96')
+  })
+})

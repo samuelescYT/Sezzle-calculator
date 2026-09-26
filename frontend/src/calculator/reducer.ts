@@ -82,6 +82,8 @@ export type CalculatorAction =
   | { type: 'sqrt' }
   | { type: 'equals' }
   | { type: 'clear' }
+  /** Brings back a past calculation, e.g. picked from the history. */
+  | { type: 'restore'; expression: string; result: number }
   | { type: 'requestSucceeded'; id: number; result: number }
   | { type: 'requestFailed'; id: number; message: string }
 
@@ -160,6 +162,9 @@ function handleInput(state: CalculatorState, action: InputAction): CalculatorSta
       return pressPercent(state)
     case 'sqrt':
       return pressSqrt(state)
+    case 'restore':
+      // Same state as right after that calculation finished: the result, explained by its equation.
+      return { ...state, entry: String(action.result), entryState: 'value', pending: null, trace: action.expression }
   }
 }
 

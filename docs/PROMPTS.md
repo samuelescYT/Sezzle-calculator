@@ -111,6 +111,42 @@ I reviewed each stage (the diff summary, test results and coverage) before appro
 - **Brand:** Sezzle palette as Tailwind theme tokens, the logo inside the `<h1>`, the Sezzle icon as favicon, and a dark text on the green equals key for contrast.
 - **Tests:** 197 in total, including clearing history from both the state and `localStorage`.
 
+## 11. History interactions, glassmorphism and responsive sizing
+
+> Yes commit and push it, The UI is looking great, but we need to polish the UX, styling, and responsiveness. Please implement these refinements:
+>
+> - Make the history items clickable buttons.
+>
+> - When a user clicks a history item, it should restore the calculator's state.
+>
+> - Apply a premium glassmorphism effect to the history panel
+>
+> - Use Tailwind classes like bg-[#2D1144]/60 backdrop-blur-xl border border-white/10 to get that frosted glass look over the background.
+>
+> - On mobile screens, the calculator should NOT look like a floating card. It must take up the entire screen
+>
+> - The rounded card layout should only apply on sm: breakpoints and up.
+>
+> - On laptops, the UI currently overflows vertically and requires scrolling, it needs to fit perfectly on shorter screen without scrolling
+>
+> Write and update any neccesary test
+
+**Result:**
+- **Restoring from history:** history entries are buttons. A new `restore` reducer action brings back the result and its equation. The overlay closes after a pick on smaller screens, and entries are disabled while a request is running.
+- **Glass panel:** frosted-glass history panel with a thin scrollbar.
+- **Sizing:** full screen on phones; a rounded card only from `sm`, with a height capped by the viewport; flexible keypad rows. Checked for no scrolling at nine viewport sizes, from 360×640 to 1920×1080, including 1280×600 laptops.
+- **Tests:** 209 in total.
+
+## 12. Giving the glass something to blur
+
+> before pushing, you're right, The desktop glassmorphism feels flat because there's nothing vibrant behind it to blur. Let's implement your suggestion to fix this
+
+**Result:**
+- **Brand glow:** a decorative `BrandGlow` layer of blurred blobs in the four accent colors, anchored to the page center in rem so coral and orange sit behind the history column.
+- **Translucent card** from `sm`, with no `backdrop-filter` of its own, so the panel's blur can reach the glow. The panel is lighter on desktop.
+- **Phones:** unchanged.
+- **Accessibility fix:** a new App test caught that the heading's accessible name was "SezzleCalculator"; the logo alt text is now "Sezzle Calculator".
+
 ---
 
 ## Commit history
@@ -126,3 +162,4 @@ I reviewed each stage (the diff summary, test results and coverage) before appro
 | `docs: add README, design rationale, coverage reports and prompts` | Documentation |
 | `feat(frontend): add traces for unary steps and resolve pending math on %` | UX improvement (prompt 9) |
 | `feat(frontend): add persisted operation history and Sezzle brand styling` | History panel and brand polish (prompt 10) |
+| `feat(frontend): restore from history, glass panel and viewport-fitted layout` | History interactions, responsive sizing and brand glow (prompts 11–12) |

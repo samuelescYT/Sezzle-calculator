@@ -4,9 +4,9 @@ A calculator with a **React + TypeScript + Tailwind CSS** frontend and a **Go** 
 The frontend never does arithmetic itself: every operation is computed by the backend API.
 
 - **Operations:** addition, subtraction, multiplication, division, plus the optional exponentiation, square root and percentage.
-- **Frontend:** a classic calculator. The small line shows the pending expression (`60 −`) or a trace of the last step (`√9`, `80 + 20% =`), and the large line shows the number being typed or the result. It keeps a history of the last 20 calculations in `localStorage`, supports the keyboard, works on phones, is accessible, shows errors in the display, and uses Sezzle's brand colors and logo.
+- **Frontend:** a classic calculator. The small line shows the pending expression (`60 −`) or a trace of the last step (`√9`, `80 + 20% =`), and the large line shows the number being typed or the result. It keeps a history of the last 20 calculations in `localStorage` (tap one to bring it back), supports the keyboard, fills the screen on phones and fits short laptop screens without scrolling, is accessible, shows errors in the display, and uses Sezzle's brand colors and logo.
 - **Backend:** one standard-library `net/http` service with strict input checking, a consistent JSON error format, structured logs and clean shutdown.
-- **Quality:** about 90 Go test cases and 197 frontend tests. Coverage is 100% on the backend's `internal/` packages and 100% of lines on the frontend.
+- **Quality:** about 90 Go test cases and 210 frontend tests. Coverage is 100% on the backend's `internal/` packages and 100% of lines on the frontend.
 
 ---
 
@@ -94,7 +94,7 @@ Coverage thresholds are set to 90% in `vite.config.ts`, and the coverage run fai
 | Layer                                          | Tests    | Statements | Branches | Functions | Lines |
 |------------------------------------------------|----------|-----------:|---------:|----------:|------:|
 | Backend `internal/calculator`, `internal/api`  | ~90 cases | 100%      | n/a      | 100%      | n/a   |
-| Frontend `src/`                                | 197      | 99.5%      | 98.9%    | 100%      | 100%  |
+| Frontend `src/`                                | 210      | 99.6%      | 98.9%    | 100%      | 100%  |
 
 `cmd/server/main.go` only wires things together (configuration, logger, server start and shutdown) and has no logic of its own, so it isn't unit tested. It is exercised by the Docker build and the smoke tests.
 
@@ -109,7 +109,7 @@ What the tests cover:
   - Number formatting, the keyboard mapping, and the API client with `fetch` stubbed.
   - The history module: the cap of 20, and loading and saving that survive corrupt, tampered or blocked `localStorage`.
   - The presentational components.
-  - Full user flows with React Testing Library and `user-event` against a mocked API module. These include `80 + 20%` resolving to 96, traces for `%` and `√`, chained operations, errors, keys disabled while a request runs, `AC` cancelling it, keyboard input, and history: recording, restoring, clearing, and ignoring intermediate steps, errors and responses that arrive after `AC`.
+  - Full user flows with React Testing Library and `user-event` against a mocked API module. These include `80 + 20%` resolving to 96, traces for `%` and `√`, chained operations, errors, keys disabled while a request runs, `AC` cancelling it, keyboard input, and history: recording, restoring after a reload, bringing back a clicked entry, clearing, and ignoring intermediate steps, errors and responses that arrive after `AC`.
 
 ---
 
@@ -224,7 +224,7 @@ It works like a classic pocket calculator. Each operation runs as soon as the ne
 - **Input rules:** a number can have at most 15 digits and one decimal point. `±` changes the sign, and `⌫` deletes the last digit.
 - **While a request is running:** every key except `AC` is disabled, and `AC` cancels the request.
 - **Keyboard:** `0–9`, `.`, `+ - * / ^ %`, `Enter` or `=`, `Backspace`, `Escape` or `Delete` (clears everything).
-- **History:** the clock icon at the top left of the display opens the last 20 final results (from `=` or an auto-resolved `%`), newest first, with the equation above each result. They're saved in `localStorage`, so they survive a reload, and **Clear** wipes both the list and the stored copy. On a phone the panel covers the keypad and leaves the display visible. On wider screens the card widens and the history appears beside the calculator, behind a divider.
+- **History:** the clock icon at the top left of the display opens the last 20 final results (from `=` or an auto-resolved `%`), newest first, with the equation above each result. Each entry is a button: **clicking it restores that result** with its equation, exactly as right after calculating it, so you can continue from there. They're saved in `localStorage`, so they survive a reload, and **Clear** wipes both the list and the stored copy. On a phone the panel is a frosted-glass overlay on the keypad, which leaves the display visible and closes once an entry is picked. On wider screens the card widens and the history appears beside the calculator.
 
 ---
 
@@ -317,9 +317,22 @@ It works like a classic pocket calculator. Each operation runs as soon as the ne
 - **The rest lives in its own layer.** `src/history/history.ts` has pure functions: append with a cap of 20, plus load and save. `useHistory` adds React state and writes to `localStorage` in an effect.
 - **Stored data is treated as untrusted.** Missing, corrupt or tampered data is validated entry by entry and capped. If storage is blocked or full, history still works for the session.
 
+**Restoring from history.** A `restore` action puts the reducer in the same state as right after that calculation: the result as a value and the equation as the trace. Typing a digit starts fresh, and an operator continues from the result. Entries are disabled while a request is running. On smaller screens, where the panel covers the keypad, picking an entry also closes it. A `matchMedia` check against the same `md` breakpoint decides this.
+
+**Sizing.**
+- **Phones (below `sm`):** the calculator is the whole screen (`h-dvh`), with no rounding, ring or shadow.
+- **`sm` and up:** it becomes a rounded card whose height is `min(42rem, 100dvh − 2rem)`.
+- **Inside,** the display row is `minmax(7rem, 1fr)`, and the keypad row is `minmax(15rem, 28rem)` with six equal rows. On a tall screen the keys reach full size and the display takes the extra space. On a short laptop screen the keys shrink instead of the page scrolling.
+- **Checked without scrolling** at 360×640, 390×844, 430×932, 700×800, 1280×600, 1280×650, 1366×768, 1440×900 and 1920×1080. At 1280×600 the keys are about 51 px tall; elsewhere they reach 60–65 px.
+
 **Responsive layout from a single grid.** The display and keypad are grid items.
 - **On phones**, the history panel is placed in the *same grid cell* as the keypad, so it covers the keypad exactly and the display stays visible. This was checked pixel for pixel.
 - **From the `md` breakpoint**, the panel moves to a second column spanning both rows. The card widens from `24rem` to `43.5rem`, and the calculator column stays exactly the same width.
+- **The panel is frosted glass** (`bg-sezzle-plum/60 backdrop-blur-xl border border-white/10`, lighter at `/35` from `md`). Over the keypad on phones, it blurs the keys underneath. It has a thin, translucent scrollbar.
+- **A brand glow gives the glass something to blur on desktop.** From `sm`, soft blurred blobs in the four accent colors (`BrandGlow`, `aria-hidden`, ignores clicks) sit behind a translucent card (`bg-sezzle-plum/60`).
+  - The blobs are placed relative to the page center **in rem**, so coral and orange always sit behind the history column, whatever the screen width.
+  - The card deliberately has **no** `backdrop-filter` of its own. An element with one becomes a boundary for its descendants' backdrop, so the panel could no longer see the glow.
+  - Phones keep an opaque full-screen calculator with no glow.
 - **The panel's content is absolutely positioned,** so a long history scrolls inside the panel instead of stretching the layout.
 
 **Brand.**
@@ -334,7 +347,7 @@ It works like a classic pocket calculator. Each operation runs as soon as the ne
 **Accessibility and responsiveness.**
 - Every key has an `aria-label`, the result is an `<output aria-live="polite">`, and the pending operator uses `aria-pressed`.
 - The history toggle uses `aria-expanded`/`aria-controls`, and the panel is a labelled region.
-- The logo sits inside the `<h1>`, whose accessible name is "Sezzle Calculator".
+- The logo is the `<h1>`, with the alt text "Sezzle Calculator" as its accessible name.
 - Keyboard focus is visible, and the full keyboard is supported. Pressing `Enter` doesn't also click whichever key has focus.
 
 **Testing approach.**

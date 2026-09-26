@@ -71,7 +71,7 @@ interface KeypadProps {
 
 export function Keypad({ onPress, disabled, activeOperator }: KeypadProps) {
   return (
-    <div className="grid auto-rows-[4rem] grid-cols-4 gap-3">
+    <div className="grid h-full grid-cols-4 grid-rows-6 gap-3">
       {KEYS.map(({ label, name, action, variant, className = '' }) => {
         const isOperator = action.type === 'operator'
         const isActive = isOperator && action.operator === activeOperator

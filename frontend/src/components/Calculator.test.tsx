@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, calculate, type Operation } from '../api/calculatorApi'
 import { HISTORY_STORAGE_KEY } from '../history/history'
 import { Calculator } from './Calculator'
@@ -375,6 +375,75 @@ describe('Calculator', () => {
 
       await expectResult('42')
       expect(historyItems()).toEqual(['6 × 7 =42'])
+    })
+
+    describe('restoring an entry', () => {
+      const savedEntries = [
+        { expression: '12 + 3 =', result: 15 },
+        { expression: '80 + 20% =', result: 96 },
+      ]
+
+      beforeEach(() => {
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(savedEntries))
+      })
+
+      afterEach(() => {
+        vi.unstubAllGlobals()
+      })
+
+      it('restores the result and its equation', async () => {
+        const user = setup()
+        await user.keyboard('123')
+        await openHistory(user)
+
+        await click(user, '80 + 20% = 96')
+
+        expect(result()).toHaveTextContent('96')
+        expect(expression()).toHaveTextContent('80 + 20% =')
+      })
+
+      it('lets the calculation continue from the restored result', async () => {
+        const user = setup()
+        await openHistory(user)
+        await click(user, '12 + 3 = 15')
+
+        await user.keyboard('*2{Enter}')
+
+        await expectResult('30')
+        expect(calls()).toEqual([['multiply', 15, 2]])
+      })
+
+      it('closes the panel on smaller screens, where it covers the keypad', async () => {
+        const user = setup()
+        await openHistory(user)
+
+        await click(user, '12 + 3 = 15')
+
+        expect(screen.queryByRole('region', { name: 'History' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Show history' })).toHaveAttribute('aria-expanded', 'false')
+      })
+
+      it('keeps the panel open on wide screens, where it sits beside the keypad', async () => {
+        vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(min-width: 48rem)' }))
+        const user = setup()
+        await openHistory(user)
+
+        await click(user, '12 + 3 = 15')
+
+        expect(result()).toHaveTextContent('15')
+        expect(historyPanel()).toBeInTheDocument()
+      })
+
+      it('cannot restore while a calculation is in flight', async () => {
+        vi.stubGlobal('matchMedia', () => ({ matches: true }))
+        calculateMock.mockImplementation(() => new Promise(() => {}))
+        const user = setup()
+        await openHistory(user)
+
+        await click(user, '2', 'Add', '3', 'Equals')
+
+        expect(screen.getByRole('button', { name: '12 + 3 = 15' })).toBeDisabled()
+      })
     })
   })
 })
